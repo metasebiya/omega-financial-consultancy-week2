@@ -7,88 +7,83 @@ class DataCleaner:
 
     def __init__(self, output_dir: str = "../data/processed/"):
         """
-        Initializes the DataCleaner class.
+        Initializes the DataCleaner class with an output directory.
         """
         self.output_dir = output_dir
+        os.makedirs(self.output_dir, exist_ok=True)  # Ensure directory exists
 
-    def clean_data(self, df: pd.DataFrame, key) -> pd.DataFrame:
-
-        print("\n📊 Data Description:")
-        print(df.describe())
-
+    def clean_data(self, df: pd.DataFrame, key: str) -> pd.DataFrame:
         if df.empty:
-            print("The DataFrame is empty, so it has no columns.")
-        else:
-            print("Columns in the DataFrame:")
-            print(df.columns.tolist())
+            print("\n⚠️ The DataFrame is empty.")
+            return df
 
-        # column renaming code
-        renamed_column = {
+        print("\n📊 Initial Data Description:")
+        print(df.describe(include='all'))
+        print("\n📋 Initial Columns:", df.columns.tolist())
+
+        # Column renaming
+        rename_map = {
             'Review Text': "review_text",
             'Rating': 'rating',
             'Date': 'date',
             'Bank/App Name': 'bank_name',
             'Source': 'source'
         }
-        df = df.rename(columns=renamed_column)
+        df.rename(columns=rename_map, inplace=True)
+        print("✅ Columns renamed to:", df.columns.tolist())
 
-        print("Columns after renaming:", df.columns.tolist())
-
-        # 2. Check shape and size
-        print(f"\n🧱 Shape: {df.shape} (rows, columns)")
-        print(f"📦 Size: {df.size} (total elements)")
-
-        # Check Info
-        print(f"\n🧱 Data Types of the df: {df.dtypes}")
-        print(f"\n🧱 Info of the DF: {df.info}")
-        print(f"\n🧱 Duplicated Values: {df.duplicated().sum()}")
-
-        # Check for missing values
-        print("\n🕳️ Missing Values Per Column:")
+        # Shape and basic info
+        print(f"\n🧱 Shape: {df.shape}")
+        print(f"📦 Total Elements: {df.size}")
+        print(f"\n📂 Data Types:\n{df.dtypes}")
+        print("\n🧾 Missing Values Per Column:")
         print(df.isnull().sum())
+        print(f"\n🔍 Duplicate Rows: {df.duplicated().sum()}")
 
-        # Drop completely empty rows and columns
-        df = df.dropna(how='all')  # Drop rows where all values are NaN
-        df = df.dropna(axis=1, how='all')  # Drop columns where all values are NaN
+        # Drop rows and columns with all NaN values
+        df.dropna(how='all', inplace=True)
+        df.dropna(axis=1, how='all', inplace=True)
 
-        # # 5. Optional: Fill missing values with placeholders or drop them
-        # # df = df.fillna("Unknown")  # or choose specific columns
-        #
-        # # 6. Strip whitespace from string columns
-        # str_cols = df.select_dtypes(include='object').columns
-        # df[str_cols] = df[str_cols].apply(lambda x: x.str.strip())
+        # Strip whitespace in string columns
+        str_cols = df.select_dtypes(include='object').columns
+        df[str_cols] = df[str_cols].apply(lambda col: col.str.strip())
 
-        #  Normalize dates to YYYY-MM-DD
-        df['date'] = pd.to_datetime(df['date'])
-        df['date'] = df['date'].dt.strftime('%Y-%m-%d')
-        print(f" Normalized 'at' column to 'date' (YYYY-MM-DD).{df["date"]}")
+        # Normalize date column
+        if 'date' in df.columns:
+            try:
+                df['date'] = pd.to_datetime(df['date'], errors='coerce')
+                df['date'] = df['date'].dt.strftime('%Y-%m-%d')
+                print("📅 Date column normalized to YYYY-MM-DD format.")
+            except Exception as e:
+                print(f"❌ Error parsing dates: {e}")
 
-        print("\n✅ Data cleaning complete.")
-        file_name = key+"_review_cleaned.csv"
+        # Save cleaned data
+        file_name = f"{key}_review_cleaned.csv"
         file_path = os.path.join(self.output_dir, file_name)
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
-                print(f"🔄 Existing file '{file_name}' found and removed.")
-            else:
-                print(f"🆕 No existing file '{file_name}' found. Creating new file.")
-            df.to_csv(file_path)
-            print(f"✅ DataFrame successfully saved to: {file_path}")
+                print(f"🔄 Replacing existing file: {file_name}")
+            df.to_csv(file_path, index=False)
+            print(f"✅ Cleaned data saved to: {file_path}")
         except Exception as e:
-            print(f"❌ Error saving DataFrame to {file_path}: {e}")
+            print(f"❌ Failed to save cleaned data: {e}")
+
         return df
 
 
-
 if __name__ == "__main__":
-    df = {
+    data_sources = {
         "CBE": "../data/raw/Commercial Bank of Ethiopia_reviews.csv",
         "BOA": "../data/raw/BoA Mobile_reviews.csv",
         "Dashen": "../data/raw/Dashen Bank_reviews.csv"
     }
-    load_data = DataLoader()
-    all_data = load_data.load_data(df)
-    clean_data = DataCleaner()
-    for key, data in all_data.items():
-        cd = clean_data.clean_data(data, key)
-        print(cd)
+
+    loader = DataLoader()
+    data_dict = loader.load_data(data_sources)
+    cleaner = DataCleaner()
+
+    for bank_key, bank_df in data_dict.items():
+        cleaned_df = cleaner.clean_data(bank_df, bank_key)
+        print(f"\n🧼 Cleaned Data Preview for {bank_key}:")
+        print(cleaned_df.head())
