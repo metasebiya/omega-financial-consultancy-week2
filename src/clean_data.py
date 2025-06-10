@@ -43,10 +43,28 @@ class DataCleaner:
         # Drop rows and columns with all NaN values
         df.dropna(how='all', inplace=True)
         df.dropna(axis=1, how='all', inplace=True)
+        df.drop_duplicates(inplace=True)
+
+        print(f"\n🔍 Duplicate Rows After dropping: {df.duplicated().sum()}")
+
+        # 5. Fill missing values with placeholders or drop them
+        if 'review_text' in df.columns:
+            df['review_text'] = df['review_text'].fillna('')
+            print("Filled missing 'review_text' with empty strings.")
+
+        if 'bank_name' in df.columns:
+            df['bank_name'] = df['bank_name'].fillna('Unknown Bank')
+            print("Filled missing 'bank_name' with 'Unknown Bank'.")
+
+        print("\n🕳️ Missing Values Per Column (After dropping/filling specific columns):")
+        print(df.isnull().sum())
 
         # Strip whitespace in string columns
         str_cols = df.select_dtypes(include='object').columns
         df[str_cols] = df[str_cols].apply(lambda col: col.str.strip())
+
+        #cleaning reviewing text column
+        df['review_text'] = df['review_text'].astype(str).str.lower().replace(r'[^a-zA-Z0-9\s]', '', regex=True)
 
         # Normalize date column
         if 'date' in df.columns:
