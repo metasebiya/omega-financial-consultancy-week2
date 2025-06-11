@@ -253,7 +253,7 @@ if __name__ == "__main__":
         output_path = f"../data/processed/{bank_key}_reviews_processed_for_themes.csv"
         # Select and reorder columns as specified (review id, review text, sentiment label, sentiment score, identified theme(s))
         # Assuming 'review_id' could be just the DataFrame index if not explicitly present
-        final_columns = ['bank_name', 'review_text', 'sentiment', 'score', 'identified_themes', 'rating',
+        final_columns = ['bank_name', 'review_text', 'date', 'sentiment', 'score', 'identified_themes', 'rating',
                          'spacy_keywords', 'tfidf_keywords']
         cleaned_df[final_columns].to_csv(output_path, index=False)
         print(f"💾 Processed data for {bank_key} saved to {output_path}")
