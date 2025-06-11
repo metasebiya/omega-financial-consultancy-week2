@@ -23,8 +23,8 @@ class Visualizer:
         self.data = df.copy()  # Use .copy() to avoid SettingWithCopyWarning later
 
         # Ensure 'review_date' is datetime type
-        if 'review_date' in self.data.columns and not pd.api.types.is_datetime64_any_dtype(self.data['review_date']):
-            self.data['review_date'] = pd.to_datetime(self.data['review_date'], errors='coerce')
+        if 'date' in self.data.columns and not pd.api.types.is_datetime64_any_dtype(self.data['date']):
+            self.data['date'] = pd.to_datetime(self.data['date'], errors='coerce')
 
         # Ensure list-like columns are actual lists, not string representations of lists
         list_cols = ['identified_themes', 'spacy_keywords', 'tfidf_keywords']
@@ -42,52 +42,59 @@ class Visualizer:
     # Function to generate sentiment trend plot
     def plot_sentiment_trends(self):
         print("Generating Sentiment Trends Over Time plot...")
-        plt.figure(figsize=(12, 7))  # Increased figure size for better readability
-
-        plot_df = self.data.dropna(subset=['review_date', 'sentiment_score', 'bank_name']).copy()
+        plot_df = self.data.dropna(subset=['date', 'sentiment', 'bank_name']).copy()
         if plot_df.empty:
             print("Not enough data to plot sentiment trends after dropping NaNs.")
             return
 
         for bank in plot_df['bank_name'].unique():
             bank_data = plot_df[plot_df['bank_name'] == bank]
-            # Group by 'review_date' (monthly) and calculate mean sentiment score
-            # CORRECTED: 'date' changed to 'review_date'
-            monthly_sentiment = bank_data.groupby(bank_data['review_date'].dt.to_period('M'))['sentiment_score'].mean()
-            monthly_sentiment.index = monthly_sentiment.index.to_timestamp()  # Convert PeriodIndex to Timestamp for plotting
+            sentiment_map = {'positive': 1, 'neutral': 0, 'negative': -1}
+            bank_data['sentiment_score'] = bank_data['sentiment'].map(sentiment_map)
+
+            monthly_sentiment = bank_data.groupby(bank_data['date'].dt.to_period('M'))['sentiment_score'].mean()
+            monthly_sentiment.index = monthly_sentiment.index.to_timestamp()
+
+            plt.figure(figsize=(12, 7))
             plt.plot(monthly_sentiment.index, monthly_sentiment.values, label=bank, marker='o', linestyle='-')
+            plt.title(f'Sentiment Trends Over Time - {bank}', fontsize=16, pad=20)
+            plt.xlabel('Date', fontsize=12)
+            plt.ylabel('Average Sentiment Score', fontsize=12)
+            plt.legend(title='Bank')
+            plt.xticks(rotation=45)
+            plt.grid(True, linestyle='--', alpha=0.7)
+            plt.tight_layout()
 
-        plt.title('Sentiment Trends Over Time by Bank', fontsize=16, pad=20)  # Enhanced title
-        plt.xlabel('Date', fontsize=12)
-        plt.ylabel('Average Sentiment Score', fontsize=12)
-        plt.legend(title='Bank')  # Added title to legend
-        plt.xticks(rotation=45, ha='right')  # Improved tick rotation
-        plt.grid(True, linestyle='--', alpha=0.7)  # Added grid
-        plt.tight_layout()
-        plt.savefig(os.path.join(FIGURES_DIR, 'sentiment_trends.png'))  # Save to FIGURES_DIR
-        plt.show()  # Show the plot after all lines are drawn
-        plt.close()
-        print("Sentiment Trends plot saved and displayed.")
+            safe_bank_name = bank.lower().replace(" ", "_").replace("/", "_").replace("\\", "_")
+            file_path = os.path.join(FIGURES_DIR, f'sentiment_trends_{safe_bank_name}.png')
+            plt.savefig(file_path)
+            plt.show()
+            plt.close()
+            print(f"Sentiment Trends plot saved for {bank}: {file_path}")
 
-    # Function to generate rating distribution plot
     def plot_rating_distribution(self):
         print("Generating Rating Distribution by Bank plot...")
-        plt.figure(figsize=(10, 6))
         plot_df = self.data.dropna(subset=['rating', 'bank_name']).copy()
         if plot_df.empty:
             print("Not enough data to plot rating distribution after dropping NaNs.")
             return
 
-        sns.countplot(data=plot_df, x='rating', hue='bank_name', palette='viridis')  # Using countplot for categories
-        plt.title('Rating Distribution by Bank', fontsize=16, pad=20)  # Enhanced title
-        plt.xlabel('Rating (1-5 Stars)', fontsize=12)  # Clarified label
-        plt.ylabel('Number of Reviews', fontsize=12)  # Clarified label
-        plt.legend(title='Bank')
-        plt.tight_layout()
-        plt.savefig(os.path.join(FIGURES_DIR, 'rating_distribution.png'))  # Save to FIGURES_DIR
-        plt.show()
-        plt.close()
-        print("Rating Distribution plot saved and displayed.")
+        for bank in plot_df['bank_name'].unique():
+            bank_data = plot_df[plot_df['bank_name'] == bank]
+
+            plt.figure(figsize=(10, 6))
+            sns.countplot(data=bank_data, x='rating', palette='viridis')
+            plt.title(f'Rating Distribution - {bank}', fontsize=16, pad=20)
+            plt.xlabel('Rating (1-5 Stars)', fontsize=12)
+            plt.ylabel('Number of Reviews', fontsize=12)
+            plt.tight_layout()
+
+            safe_bank_name = bank.lower().replace(" ", "_").replace("/", "_").replace("\\", "_")
+            file_path = os.path.join(FIGURES_DIR, f'rating_distribution_{safe_bank_name}.png')
+            plt.savefig(file_path)
+            plt.show()
+            plt.close()
+            print(f"Rating Distribution plot saved for {bank}: {file_path}")
 
     # Function to generate keyword cloud per bank
     def plot_keyword_cloud(self):
@@ -182,8 +189,8 @@ class Visualizer:
                     f"**{bank}**: Enhance login reliability and consider integrating AI chatbot for faster issue resolution.")
 
             # Check for generic "Feature Requests" among all themes for the bank
-            if 'Feature Requests' in [theme for sublist in bank_data['identified_themes'] if isinstance(sublist, list)
-                                      for theme in sublist]:
+            if 'Feature Requests' in [theme for sublist in bank_data['identified_themes'] if
+                                      isinstance(sublist, list) for theme in sublist]:
                 recommendations.append(
                     f"**{bank}**: Analyze and prioritize highly requested features (e.g., fingerprint login, budgeting tools).")
             if not recommendations:
